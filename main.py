@@ -9,7 +9,7 @@ import urllib.parse
 
 api_keys = {"trefle": "Fl172rMx2vXJDhRa6MYesqIvACkibM-kZ0JzOEtRPvA",
             "plantnet": "2b10GOhutBEPgPOOZKAsVtygyO",
-            "owm": "b5608072b03d5196b9c9942fb2dc4cb0"}
+            "owm": "ec0a87e71fdc1a7b9f581d884bd619d9"}
 
 
 def fetch(url, site):
@@ -45,4 +45,8 @@ lat = r[0]["lat"]
 lon = r[0]["lon"]
 
 # Get weather for location
-r = fetch(f'http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}', "owm")
+#r = fetch(f'http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}', "owm")
+owm_api_key = "b5608072b03d5196b9c9942fb2dc4cb0"
+url = f'http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={owm_api_key}'
+print(url)
+r = get(url).json()
