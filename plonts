@@ -4,6 +4,7 @@
 from requests import get
 from datetime import datetime
 import pandas as pd
+from platform import uname
 #from PIL import Image
 #import matplotlib.pyplot as plt
 from argparse import ArgumentParser, SUPPRESS
@@ -64,10 +65,13 @@ if 'image_url' in result:
     # photo = get(image, stream=True)
     # photo.raw.decode_content = True
     # plt.imshow(Image.open(photo.raw))
-    # MacOS chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
-    # Windows chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
-    # Linux
-    chrome_path = '/usr/bin/google-chrome %s'
+    if 'Linux' in uname()[0]:
+        chrome_path = '/usr/bin/google-chrome %s'
+    elif 'Windows' in uname()[0]:
+        chrome_path = 'C:/Program Files/Google/Chrome/Application/chrome.exe %s'
+    else:
+        chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
+
     webbrowser.get(chrome_path).open(result['image_url'])
 else: print(f"\nNo image for {result['common_name']}")
 
