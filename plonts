@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from requests import get
+from datetime import datetime
+import pandas as pd
+#from PIL import Image
+#import matplotlib.pyplot as plt
+from argparse import ArgumentParser, SUPPRESS
+import webbrowser
+
+parser = ArgumentParser(usage="plonts [plant name]")
+parser.add_argument('query', type=str, nargs='?', default='Garden strawberry', help=SUPPRESS)
+args = parser.parse_args()
+
+api_keys = {"trefle": "Fl172rMx2vXJDhRa6MYesqIvACkibM-kZ0JzOEtRPvA",
+            "plantnet": "2b10GOhutBEPgPOOZKAsVtygyO",
+            "owm": "b5608072b03d5196b9c9942fb2dc4cb0"}
+
+def fetch(url, site):
+    return get(url, headers={'Authorization': f'Bearer {api_keys[site]}'}).json()
+
+loc = get("https://geolocation-db.com/json").json()
+lat, lon = loc["latitude"], loc["longitude"]
+place = f'{loc["city"]} ({loc["postal"]}), {loc["country_name"]}'
+
+# Get weather for location from OpenWeatherMap
+url = f'http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_keys["owm"]}'
+owm = get(url).json()
+weather_main = owm["weather"][0]["main"]
+weather_desc = owm["weather"][0]["description"]
+temp_main = int(owm["main"]["temp"] - 273.15)
+humidity = owm["main"]["humidity"]
+wind_speed = int(owm["wind"]["speed"])
+sunrise = datetime.fromtimestamp(owm["sys"]["sunrise"]).strftime("%X")
+sunset = datetime.fromtimestamp(owm["sys"]["sunset"]).strftime("%X")
+light_hours = datetime.fromtimestamp(owm["sys"]["sunset"]-owm["sys"]["sunrise"]).strftime("%X")
+print(f'\nCurrent weather in {place}:\n'
+      f'{weather_main} - {weather_desc}, '
+      f'{temp_main}°C, {humidity}% humidity '
+      f'and {wind_speed}mph winds\n'
+      f'--- {light_hours} hours of light today ---\n')
+
+# Query trefle api with plant name
+search = fetch(f'https://trefle.io/api/v1/plants/search?q={args.query}', "trefle")
+if len(search['data']) == 0:
+    print("No results found")
+else:
+    # Put in dataframe and print for developing - remove later
+    query_df = pd.DataFrame(search['data'])
+    query_df['Hit'] = query_df.index + 1
+    print(query_df[['Hit','common_name', 'slug']].to_markdown(index=False))
+    print()
+    hit_range = query_df['Hit'].tolist()
+    choice = int(input("Select hit number: "))
+    while choice not in hit_range:
+        choice = int(input(f"Please select a number from the following results...\n"
+                       f"{query_df[['Hit','common_name', 'slug']].to_markdown(index=False)}"))
+
+# Fetch the 'species' data for first result based on dataframe 'slug' column
+result = fetch(f'https://trefle.io/api/v1/species/{query_df.slug[choice-1]}', "trefle")['data']
+
+if 'image_url' in result:
+    # photo = get(image, stream=True)
+    # photo.raw.decode_content = True
+    # plt.imshow(Image.open(photo.raw))
+    # MacOS chrome_path = 'open -a /Applications/Google\ Chrome.app %s'
+    # Windows chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
+    # Linux
+    chrome_path = '/usr/bin/google-chrome %s'
+    webbrowser.get(chrome_path).open(result['image_url'])
+else: print(f"\nNo image for {result['common_name']}")
+
+grw = result['growth']
+
+for key, value in dict(grw).items():
+    if isinstance(value, dict):
+
+        for k, v in dict(value).items():
+            if v is None:
+                del value[k]
+
+        if len(dict(value).items()) == 0:
+            del grw[key]
+
+    if value is None:
+        del grw[key]
+
+grw_df = pd.DataFrame.from_dict(result['growth'], orient='index', columns=['data'])
+
+if 'description' in grw:
+    print(f'\n{grw["description"]}')
+    grw_df = grw_df.drop('description',axis=0)
+
+grw_df = grw_df.rename_axis('condition').reset_index()
+
+if grw_df.empty:
+    print(f"\nNo growth conditions available...")
+else:
+    print(f'\nGrowth conditions:\n'
+          f'{grw_df.dropna().to_markdown(index=False)}')
+
